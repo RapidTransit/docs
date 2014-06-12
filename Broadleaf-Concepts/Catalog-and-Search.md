@@ -96,6 +96,148 @@ This is very similar to adding a sort clause. The exact same translation step oc
 
 > Note: You do not want to facet on text fields - instead, you want to facet on String fields as it will provide an exact match.
 
+### Extended Products with Data Driven Enumerations
+
+For implementors who have extended ProductImpl which include fields using a data driven enumeration it is also possible to index those field values as well.
+
+Lets take for example we have extended ProductImpl with our own HotSauceProductImpl and we added a new with the appropiate getters and setters
+
+> Note: Getters and Setters not shown.
+
+```java
+    @ManyToMany(targetEntity = HotSauceIngredientImpl.class, fetch = FetchType.LAZY)
+    @AdminPresentationCollection(friendlyName = "Hot Sauce Ingredients", manyToField = "hotSauceProducts", addType = AddMethodType.LOOKUP)
+    @JoinTable(name = "BLC_HOT_SAUCE_INGREDIENTS_XREF",
+            joinColumns = {@JoinColumn(name = "PRODUCT_ID", referencedColumnName = "PRODUCT_ID")},
+            inverseJoinColumns = {@JoinColumn(name = "HOT_SAUCE_INGREDIENT_ID", referencedColumnName = "HOT_SAUCE_INGREDIENT_ID")} )
+    protected List<HotSauceIngredient> hotSauceIngredients = new ArrayList<HotSauceIngredient>();
+```
+
+If we want Broadleaf to pickup up our values, we must name the value field (In the Key -> Value Relationship) value. We must also overide toString(), equals(), and hashcode()
+
+> Note: For the sake of brevity, the declared interface is not shown
+
+```java
+@Entity
+@Table(name = "BLC_HOTSAUCE_INGREDIENTS")
+@AdminPresentationClass(friendlyName = "Hot Sauce Ingredients")
+public class HotSauceIngredientImpl implements HotSauceIngredient
+{
+
+    @Id
+    @GeneratedValue(generator = "HotSauceIngredientId")
+    @GenericGenerator(name = "HotSauceIngredientId", strategy = "org.broadleafcommerce.common.persistence.IdOverrideTableGenerator", parameters = {
+            @Parameter(name="segment_value", value="HotSauceIngredientImpl"),
+            @Parameter(name="entity_name", value="com.mycompany.core.domain.HotSauceIngredientImpl") })
+    @Column(name = "HOT_SAUCE_INGREDIENT_ID")
+    @AdminPresentation(visibility = org.broadleafcommerce.common.presentation.client.VisibilityEnum.HIDDEN_ALL)
+    protected Long id;
+
+    @Column(name = "HOTSAUCE_INGREDIENT")
+    @AdminPresentation(fieldType = SupportedFieldType.STRING, friendlyName = "Hot Sauce Ingredient", prominent = true)
+    protected String value;
+
+    @ManyToMany(fetch = FetchType.LAZY, targetEntity = HotSauceProductImpl.class)
+    @JoinTable(name = "BLC_HOT_SAUCE_INGREDIENTS_XREF",
+            joinColumns = {@JoinColumn(name = "HOT_SAUCE_INGREDIENT_ID", referencedColumnName = "HOT_SAUCE_INGREDIENT_ID")},
+            inverseJoinColumns = {@JoinColumn(name = "PRODUCT_ID", referencedColumnName = "PRODUCT_ID")} )
+    protected List<HotSauceProduct> hotSauceProducts = new ArrayList<HotSauceProduct>();
+
+    public List<HotSauceProduct> getHotSauceProducts()
+    {
+        return hotSauceProducts;
+    }
+
+    public void setHotSauceProducts(List<HotSauceProduct> hotSauceProducts)
+    {
+        this.hotSauceProducts = hotSauceProducts;
+    }
+
+    public Long getId()
+    {
+        return id;
+    }
+
+    public void setId(Long id)
+    {
+        this.id = id;
+    }
+
+    public String getValue()
+    {
+        return value;
+    }
+
+    public void setValue(String value)
+    {
+        this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return value;
+    }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((hotSauceProducts == null) ? 0 : hotSauceProducts.hashCode());
+        result = prime * result + ((value == null) ? 0 : value.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        HotSauceIngredientImpl other = (HotSauceIngredientImpl) obj;
+
+        if (id != null && other.id != null) {
+            return id.equals(other.id);
+        }
+
+        if (hotSauceProducts == null) {
+            if (other.hotSauceProducts != null)
+                return false;
+        } else if (!hotSauceProducts.equals(other.hotSauceProducts))
+            return false;
+        if (value == null) {
+            if (other.value != null)
+                return false;
+        } else if (!value.equals(other.value))
+            return false;
+        return true;
+    }
+}
+```
+
+We can run the following sql to let Broadleaf know we need this field indexed:
+
+```sql
+INSERT INTO BLC_FIELD (FIELD_ID, ENTITY_TYPE, PROPERTY_NAME, ABBREVIATION, SEARCHABLE, FACET_FIELD_TYPE) VALUES (100, 'PRODUCT', 'hotSauceIngredients', 'ingredients', FALSE, 'ss');
+```
+> Note: Since we are doing a multivalued field we need to use the facet field type 'ss'
+
+
+And that the field we want indexed to be a facet field:
+
+```sql
+INSERT INTO BLC_SEARCH_FACET (SEARCH_FACET_ID, FIELD_ID, LABEL, SHOW_ON_SEARCH, MULTISELECT, SEARCH_DISPLAY_PRIORITY) VALUES (100, 100, 'Hot Sauce Ingredient', TRUE, TRUE, 0);
+```
+
+And apply it to what ever category we want:
+
+```sql
+INSERT INTO BLC_CAT_SEARCH_FACET_XREF (CATEGORY_SEARCH_FACET_ID, CATEGORY_ID, SEARCH_FACET_ID, SEQUENCE) VALUES (1,10000,100,1);
+```
+
+> Note: Sequence must be a unique number for each category, you can have the same sequence number for the same facet across multiple categories.
+
 ### Specifying pagination attributes
 
 This is very simple as well. Simple add `&pageSize=20&page=2` to show results 21-40.
