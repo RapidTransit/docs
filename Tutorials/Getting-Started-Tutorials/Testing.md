@@ -16,7 +16,7 @@ We need to first add a dependency for JMockit which is available on Maven Centra
     </dependency>
     ...
 </dependencies>
-            ```
+```
 
 Then just add it to whichever module's pom will be testing
 ```xml
@@ -30,7 +30,7 @@ Then just add it to whichever module's pom will be testing
 </dependencies>
 ```
 ###Creating the Mock
-Unlike Easymock, Mockito and their extensions, we need to create a new class for this mock.
+Unlike Easymock, Mockito and their extensions, the mock can't be autocreated, we need to create a new class for this mock.
 
 Points to consider
 * Your Mock must extend ```MockUp<T>```
